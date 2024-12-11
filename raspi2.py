@@ -10,28 +10,17 @@ except serial.SerialException as e:
     print(f"Error opening serial port: {e}")
     exit(1)
 
-def map_status(status_str):
-    # Map status string to corresponding integer value
-    if status_str == "low":
-        return 1
-    elif status_str == "medium":
-        return 2
-    elif status_str == "high":
-        return 3
-    else:
-        raise ValueError("Invalid status value. Use 'low', 'medium', or 'high'.")
-
-def send_data(dbmin, dba, dbmax, arc, status_str):
-    try:
-        # Map status to integer value
-        status = map_status(status_str)
-        
-        # Prepare the data string
-        data_str = f"{dbmin:.2f} {dba:.2f} {dbmax:.2f} {arc} {status}\n"
-        ser.write(data_str.encode())
-        print(f"Sent data: {data_str.strip()}")
-    except ValueError as e:
-        print(f"Error: {e}")
+def send_data(dbmin, dba, dbmax, arc, status):
+    # Validate the status
+    valid_status = ["low", "medium", "high"]
+    if status not in valid_status:
+        print(f"Error: Invalid status value '{status}'. Must be one of {valid_status}.")
+        return
+    
+    # Prepare the data string
+    data_str = f"{dbmin:.2f} {dba:.2f} {dbmax:.2f} {arc} {status}\n"
+    ser.write(data_str.encode())
+    print(f"Sent data: {data_str.strip()}")
 
 def read_arduino_response():
     if ser.in_waiting > 0:
@@ -47,9 +36,9 @@ try:
         dba = 55.50
         dbmax = 60.00
         arc = 2  # Integer value
-        status_str = "high"  # "low", "medium", or "high"
+        status = "high"  # Must be "low", "medium", or "high"
 
-        send_data(dbmin, dba, dbmax, arc, status_str)
+        send_data(dbmin, dba, dbmax, arc, status)
 
         while True:
             response = read_arduino_response()
@@ -65,3 +54,4 @@ except KeyboardInterrupt:
 finally:
     ser.close()
     print("Serial connection closed")
+
