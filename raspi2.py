@@ -1,6 +1,6 @@
 import serial
-import time
 import struct
+import time
 
 # Initialize serial connection to Arduino
 try:
@@ -12,39 +12,38 @@ except serial.SerialException as e:
     exit(1)
 
 def encode_payload(dbmin, dba, dbmax, arc, status):
-    """
-    Encodes the payload for transmission to the Arduino.
-    - dbmin, dba, dbmax: Floats, scaled to 2 decimal precision
-    - arc: Integer value
-    - status: String ("low", "medium", "high") converted to corresponding integer
-    """
-    # Validate and convert status
-    status_map = {"low": 1, "medium": 2, "high": 3}
-    if status not in status_map:
-        raise ValueError(f"Invalid status value: {status}. Must be one of {list(status_map.keys())}.")
-
-    status_value = status_map[status]
-
-    # Scale floats to 2 decimal places and convert to int
+    # Convert float values to 16-bit integers (scale by 100) and pack into bytes
     dbmin_int = int(dbmin * 100)
     dba_int = int(dba * 100)
     dbmax_int = int(dbmax * 100)
+    
+    # Create payload using struct packing (big endian)
+    payload = struct.pack(">hhhBB", dbmin_int, dba_int, dbmax_int, arc, status)
 
-    # Pack the data into a binary format
-    payload = struct.pack(">hhhBB", dbmin_int, dba_int, dbmax_int, arc, status_value)
+    # Calculate checksum (XOR of all bytes)
+    checksum = 0
+    for byte in payload:
+        checksum ^= byte
+
+    # Append checksum to the payload
+    payload += struct.pack("B", checksum)
     return payload
 
-def send_payload(payload):
-    """
-    Sends the binary payload to the Arduino over serial.
-    """
-    ser.write(payload)
-    print(f"Sent payload: {payload.hex()}")
+def send_data(dbmin, dba, dbmax, arc, status):
+    # Validate the status
+    valid_status = {"low": 0, "medium": 1, "high": 2}
+    if status not in valid_status:
+        print(f"Error: Invalid status value '{status}'. Must be one of {list(valid_status.keys())}.")
+        return
+
+    # Encode the payload
+    encoded_payload = encode_payload(dbmin, dba, dbmax, arc, valid_status[status])
+
+    # Send the encoded payload via serial
+    ser.write(encoded_payload)
+    print(f"Sent payload: {encoded_payload.hex()}")
 
 def read_arduino_response():
-    """
-    Reads and prints the response from the Arduino.
-    """
     if ser.in_waiting > 0:
         response = ser.readline().decode('utf-8').strip()
         print(f"Arduino: {response}")
@@ -60,12 +59,7 @@ try:
         arc = 2  # Integer value
         status = "high"  # Must be "low", "medium", or "high"
 
-        try:
-            payload = encode_payload(dbmin, dba, dbmax, arc, status)
-            send_payload(payload)
-        except ValueError as e:
-            print(e)
-            continue
+        send_data(dbmin, dba, dbmax, arc, status)
 
         while True:
             response = read_arduino_response()
@@ -73,7 +67,7 @@ try:
                 print("Data has been transmitted to LoRa")
                 break
 
-        time.sleep(30)  # Send data every 30 seconds
+        time.sleep(30)  # Send data every 30 seconds 
 
 except KeyboardInterrupt:
     print("Script interrupted by user")
