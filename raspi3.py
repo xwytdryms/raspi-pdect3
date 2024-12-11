@@ -11,8 +11,13 @@ except serial.SerialException as e:
     exit(1)
 
 def send_data(dbmin, dba, dbmax, arc, status):
-    # Format the data as a single string with space-separated values
-    data_str = f"{dbmin:.3f} {dba:.3f} {dbmax:.3f} {arc} {status}\n"
+    # Scale the float values to integers
+    dbmin_scaled = int(dbmin * 1000)  # Scale by 1000 to preserve three decimal places
+    dba_scaled = int(dba * 1000)
+    dbmax_scaled = int(dbmax * 1000)
+
+    # Format the data as a string with space-separated values
+    data_str = f"{dbmin_scaled} {dba_scaled} {dbmax_scaled} {arc} {status}\n"
     ser.write(data_str.encode())
     print(f"Sent data: {data_str.strip()}")
 
@@ -25,17 +30,17 @@ def read_arduino_response():
 
 try:
     while True:
-        # Sample data
-        dbmin = 41.234  # Example value for dbmin (float)
-        dba = 42.567    # Example value for dba (float)
-        dbmax = 43.890  # Example value for dbmax (float)
-        arc = 5         # Example value for arc (integer)
-        status = "medium"  # Example value for status (string: low, medium, high)
+        # Example data
+        dbmin = 41.234  # Original float value
+        dba = 42.567    # Original float value
+        dbmax = 43.890  # Original float value
+        arc = 5         # Integer
+        status = "medium"  # Status string ("low", "medium", "high")
 
-        # Send data to Arduino
+        # Send scaled data to Arduino
         send_data(dbmin, dba, dbmax, arc, status)
 
-        print(f"Sent dbmin: {dbmin:.3f}, dba: {dba:.3f}, dbmax: {dbmax:.3f}, arc: {arc}, status: {status}")
+        print(f"Sent dbmin: {dbmin}, dba: {dba}, dbmax: {dbmax}, arc: {arc}, status: {status}")
 
         # Wait for Arduino's response
         while True:
