@@ -1,5 +1,6 @@
 import serial
 import time
+import struct
 
 # Initialize serial connection to Arduino
 try:
@@ -10,19 +11,40 @@ except serial.SerialException as e:
     print(f"Error opening serial port: {e}")
     exit(1)
 
-def send_data(dbmin, dba, dbmax, arc, status):
-    # Validate the status
-    valid_status = ["low", "medium", "high"]
-    if status not in valid_status:
-        print(f"Error: Invalid status value '{status}'. Must be one of {valid_status}.")
-        return
-    
-    # Prepare the data string
-    data_str = f"{dbmin:.2f} {dba:.2f} {dbmax:.2f} {arc} {status}\n"
-    ser.write(data_str.encode())
-    print(f"Sent data: {data_str.strip()}")
+def encode_payload(dbmin, dba, dbmax, arc, status):
+    """
+    Encodes the payload for transmission to the Arduino.
+    - dbmin, dba, dbmax: Floats, scaled to 2 decimal precision
+    - arc: Integer value
+    - status: String ("low", "medium", "high") converted to corresponding integer
+    """
+    # Validate and convert status
+    status_map = {"low": 1, "medium": 2, "high": 3}
+    if status not in status_map:
+        raise ValueError(f"Invalid status value: {status}. Must be one of {list(status_map.keys())}.")
+
+    status_value = status_map[status]
+
+    # Scale floats to 2 decimal places and convert to int
+    dbmin_int = int(dbmin * 100)
+    dba_int = int(dba * 100)
+    dbmax_int = int(dbmax * 100)
+
+    # Pack the data into a binary format
+    payload = struct.pack(">hhhBB", dbmin_int, dba_int, dbmax_int, arc, status_value)
+    return payload
+
+def send_payload(payload):
+    """
+    Sends the binary payload to the Arduino over serial.
+    """
+    ser.write(payload)
+    print(f"Sent payload: {payload.hex()}")
 
 def read_arduino_response():
+    """
+    Reads and prints the response from the Arduino.
+    """
     if ser.in_waiting > 0:
         response = ser.readline().decode('utf-8').strip()
         print(f"Arduino: {response}")
@@ -38,7 +60,12 @@ try:
         arc = 2  # Integer value
         status = "high"  # Must be "low", "medium", or "high"
 
-        send_data(dbmin, dba, dbmax, arc, status)
+        try:
+            payload = encode_payload(dbmin, dba, dbmax, arc, status)
+            send_payload(payload)
+        except ValueError as e:
+            print(e)
+            continue
 
         while True:
             response = read_arduino_response()
@@ -46,7 +73,7 @@ try:
                 print("Data has been transmitted to LoRa")
                 break
 
-        time.sleep(10)  # Send data every 10 seconds
+        time.sleep(30)  # Send data every 30 seconds
 
 except KeyboardInterrupt:
     print("Script interrupted by user")
@@ -54,4 +81,3 @@ except KeyboardInterrupt:
 finally:
     ser.close()
     print("Serial connection closed")
-
